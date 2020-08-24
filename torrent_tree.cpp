@@ -1,6 +1,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <cmath>
 #include "bencode.hpp"
 #include "sha1.hpp"
 
@@ -75,10 +76,18 @@ int main(int argc, char *argv[]) {
 				bencode::BencodeVal info(bencode::bencode_type::dict);
 				torrent["announce"] = announce_url;
 				info["name"] = string(".");
-				info["piece length"] = 1048576;
+				uint64_t file_size = filesystem::file_size(entry.path());
+				// 5120=102400/20, looks to keep .torrent files <100K with minimum
+				// possible piece length, holding a power of 2.
+				uint64_t piece_length = max(
+					min(
+						(uint64_t)1048576,
+						(uint64_t)exp2((int)log2(file_size / 5120))),
+					(uint64_t)4096);
+				info["piece length"] = piece_length;
 				bencode::BencodeVal file(bencode::bencode_type::dict);
 				file["path"] = path_to_list(entry.path().string().erase(0, start_path.size() + 1));
-				file["length"] = filesystem::file_size(entry.path());
+				file["length"] = file_size;
 				info["files"] = vector<bencode::BencodeVal> {file};
 				info["pieces"] = string();
 				
@@ -86,8 +95,8 @@ int main(int argc, char *argv[]) {
 				if (!ifile) {
 					perror("failed to open file");
 				}
-				string buff(1048576, '\0');
-				while (ifile.read(&buff[0], 1048576)) {
+				string buff(piece_length, '\0');
+				while (ifile.read(&buff[0], piece_length)) {
 					info["pieces"] += sha1::hash(buff);
 				}
 				if (ifile.eof()) {
