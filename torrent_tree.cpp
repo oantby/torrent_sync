@@ -14,6 +14,25 @@ void usage() {
 		"on the torrents as a valid tracker." << endl;
 }
 
+// helper function for path conversions.
+bencode::BencodeVal path_to_list(const string &path, const char sep = '/') {
+	bencode::BencodeVal r(bencode::bencode_type::list);
+	
+	string cur_path;
+	for (size_t i = 0; i < path.size(); i++) {
+		if (path[i] == sep) {
+			if (cur_path.size()) {// leading slashes shouldn't result in an empty list item.
+				r.push_back(cur_path);
+				cur_path.clear();
+			}
+		} else {
+			cur_path += path[i];
+		}
+	}
+	r.push_back(cur_path);
+	return r;
+}
+
 int main(int argc, char *argv[]) {
 	if (argc < 4) {
 		usage();
@@ -47,6 +66,7 @@ int main(int argc, char *argv[]) {
 	// (or exceptions would've occurred).  That's right, I just bragged about not checking for errors.
 	string announce_url = argv[3];
 	string start_path = argv[1];
+	if (start_path.back() == '/') start_path.pop_back();
 	vector<filesystem::path> path_stack {start_path};
 	for (size_t i = 0; i < path_stack.size(); i++) {
 		for (auto &entry : filesystem::directory_iterator(path_stack[i])) {
@@ -57,16 +77,33 @@ int main(int argc, char *argv[]) {
 				info["name"] = string(".");
 				info["piece length"] = 1048576;
 				bencode::BencodeVal file(bencode::bencode_type::dict);
-				file["path"] = entry.path().string().erase(0, start_path.size() + 1);
+				file["path"] = path_to_list(entry.path().string().erase(0, start_path.size() + 1));
 				file["length"] = filesystem::file_size(entry.path());
 				info["files"] = vector<bencode::BencodeVal> {file};
+				info["pieces"] = string();
+				
+				ifstream ifile(entry.path(), ios::in|ios::binary);
+				if (!ifile) {
+					perror("failed to open file");
+				}
+				string buff(1048576, '\0');
+				while (ifile.read(&buff[0], 1048576)) {
+					info["pieces"] += sha1::hash(buff);
+				}
+				if (ifile.eof()) {
+					// loop finished with data left.  add that data.
+					buff.resize(ifile.gcount());
+					info["pieces"] += sha1::hash(buff);
+				}
 				torrent["info"] = info;
+				
 				cout << torrent.toString() << endl;
 			} else if (entry.is_directory()) {
 				path_stack.push_back(entry.path());
 			}
 		}
 	}
+	
 	
 	return 0;
 }

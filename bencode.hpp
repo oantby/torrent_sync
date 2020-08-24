@@ -39,6 +39,14 @@ namespace bencode {
 			return list[idx];
 		}
 		
+		BencodeVal operator+=(string s) {
+			if (type != bencode_type::bytes) {
+				throw runtime_error("+= (string) invalid for BencodeVal of this type");
+			}
+			bytes += s;
+			return *this;
+		}
+		
 		const BencodeVal operator[](size_t idx) const {
 			if (type != bencode_type::list) {
 				throw runtime_error("[int] operator invalid for BencodeVal of this type");
@@ -90,6 +98,14 @@ namespace bencode {
 					break;
 			}
 			return r;
+		}
+		
+		void push_back(BencodeVal v) {
+			if (type != bencode_type::list) {
+				throw runtime_error("push_back invalid for BencodeVal of this type");
+			}
+			
+			list.push_back(v);
 		}
 	};
 }
