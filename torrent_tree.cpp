@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
 	// (or exceptions would've occurred).  That's right, I just bragged about not checking for errors.
 	string announce_url = argv[3];
 	string start_path = argv[1];
+	filesystem::path out_path(argv[2]);
 	if (start_path.back() == '/') start_path.pop_back();
 	vector<filesystem::path> path_stack {start_path};
 	for (size_t i = 0; i < path_stack.size(); i++) {
@@ -106,7 +107,13 @@ int main(int argc, char *argv[]) {
 				}
 				torrent["info"] = info;
 				
-				cout << torrent.toString() << endl;
+				filesystem::path file_path = out_path / entry.path();
+				filesystem::create_directories(file_path.parent_path());
+				ofstream ofile(file_path.replace_extension(".torrent"), ios::out|ios::trunc);
+				ofile << torrent.toString();
+				ofile.close();
+				
+				//cout << torrent.toString() << endl;
 			} else if (entry.is_directory()) {
 				path_stack.push_back(entry.path());
 			}
