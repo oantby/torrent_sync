@@ -85,7 +85,7 @@ namespace bencode {
 					break;
 				case bencode_type::dict:
 					r = 'd';
-					for (const pair<const string, const BencodeVal> &x : dict) {
+					for (const pair<const string, BencodeVal> &x : dict) {
 						r += to_string(x.first.size());
 						r += ':';
 						r += x.first;
