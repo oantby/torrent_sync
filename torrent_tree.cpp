@@ -72,6 +72,9 @@ int main(int argc, char *argv[]) {
 	filesystem::path out_path(argv[2]);
 	if (start_path.back() == '/') start_path.pop_back();
 	vector<filesystem::path> path_stack {start_path};
+	string torrent_file_name = path_stack.back().has_filename() ? path_stack.back().filename()
+		: (path_stack.back().has_parent_path() ? path_stack.back().parent_path().filename() : "files");
+	
 	for (size_t i = 0; i < path_stack.size(); i++) {
 		for (auto &entry : filesystem::directory_iterator(path_stack[i])) {
 			if (entry.is_regular_file()) {
@@ -81,7 +84,7 @@ int main(int argc, char *argv[]) {
 				bencode::BencodeVal torrent(bencode::bencode_type::dict);
 				bencode::BencodeVal info(bencode::bencode_type::dict);
 				torrent["announce"] = announce_url;
-				info["name"] = string("files");
+				info["name"] = torrent_file_name;
 				uint64_t file_size = filesystem::file_size(entry.path());
 				// 5120=102400/20, looks to keep .torrent files <100K with minimum
 				// possible piece length, holding a power of 2.
