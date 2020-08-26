@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
 				uint64_t piece_length = max(
 					min(
 						(uint64_t)1048576,
-						(uint64_t)exp2((int)log2(file_size / 5120))),
+						(uint64_t)exp2((int)log2(file_size / 5120) + 1)),
 					(uint64_t)4096);
 				info["piece length"] = piece_length;
 				bencode::BencodeVal file(bencode::bencode_type::dict);
