@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 		for (auto &entry : filesystem::directory_iterator(path_stack[i])) {
 			if (entry.is_regular_file()) {
 				if (verbose) {
-					cout << "Processing " << entry << endl;
+					cout << "Processing " << entry.path() << endl;
 				}
 				bencode::BencodeVal torrent(bencode::bencode_type::dict);
 				bencode::BencodeVal info(bencode::bencode_type::dict);
