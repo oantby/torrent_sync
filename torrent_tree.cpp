@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
 				bencode::BencodeVal torrent(bencode::bencode_type::dict);
 				bencode::BencodeVal info(bencode::bencode_type::dict);
 				torrent["announce"] = announce_url;
-				info["name"] = string(".");
+				info["name"] = string("files");
 				uint64_t file_size = filesystem::file_size(entry.path());
 				// 5120=102400/20, looks to keep .torrent files <100K with minimum
 				// possible piece length, holding a power of 2.
