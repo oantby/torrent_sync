@@ -40,6 +40,8 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	
+	bool verbose = argc > 4;
+	
 	if (!filesystem::is_directory(filesystem::status(argv[1]))) {
 		cerr << "No such directory: " << argv[1] << endl;
 		usage();
@@ -73,6 +75,9 @@ int main(int argc, char *argv[]) {
 	for (size_t i = 0; i < path_stack.size(); i++) {
 		for (auto &entry : filesystem::directory_iterator(path_stack[i])) {
 			if (entry.is_regular_file()) {
+				if (verbose) {
+					cout << "Processing " << entry << endl;
+				}
 				bencode::BencodeVal torrent(bencode::bencode_type::dict);
 				bencode::BencodeVal info(bencode::bencode_type::dict);
 				torrent["announce"] = announce_url;
@@ -106,8 +111,10 @@ int main(int argc, char *argv[]) {
 					info["pieces"] += sha1::hash(buff);
 				}
 				torrent["info"] = info;
-				
-				filesystem::path file_path = out_path / entry.path();
+				filesystem::path file_path = out_path / entry.path().relative_path();
+				if (verbose) {
+					cout << "Creating " << file_path << endl;
+				}
 				filesystem::create_directories(file_path.parent_path());
 				ofstream ofile(file_path.replace_extension(".torrent"), ios::out|ios::trunc);
 				ofile << torrent.toString();
