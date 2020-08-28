@@ -111,7 +111,9 @@ int main(int argc, char *argv[]) {
 				if (ifile.eof()) {
 					// loop finished with data left.  add that data.
 					buff.resize(ifile.gcount());
-					info["pieces"] += sha1::hash(buff);
+					if (buff.size()) {
+						info["pieces"] += sha1::hash(buff);
+					}
 				}
 				torrent["info"] = info;
 				filesystem::path file_path = out_path / entry.path().relative_path();
