@@ -81,6 +81,17 @@ int main(int argc, char *argv[]) {
 				if (verbose) {
 					cout << "Processing " << entry.path() << endl;
 				}
+				
+				filesystem::path file_path = out_path / entry.path().relative_path().replace_extension(".torrent");
+				
+				// this will later be based on a command-line argument.
+				if (filesystem::exists(filesystem::status(file_path))) {
+					if (verbose) {
+						cout << "Skipping " << file_path << " - already exists" << endl;
+					}
+					continue;
+				}
+				
 				bencode::BencodeVal torrent(bencode::bencode_type::dict);
 				bencode::BencodeVal info(bencode::bencode_type::dict);
 				torrent["announce"] = announce_url;
@@ -116,16 +127,15 @@ int main(int argc, char *argv[]) {
 					}
 				}
 				torrent["info"] = info;
-				filesystem::path file_path = out_path / entry.path().relative_path();
+				
 				if (verbose) {
 					cout << "Creating " << file_path << endl;
 				}
 				filesystem::create_directories(file_path.parent_path());
-				ofstream ofile(file_path.replace_extension(".torrent"), ios::out|ios::trunc);
+				ofstream ofile(file_path, ios::out|ios::trunc);
 				ofile << torrent.toString();
 				ofile.close();
 				
-				//cout << torrent.toString() << endl;
 			} else if (entry.is_directory()) {
 				path_stack.push_back(entry.path());
 			}
