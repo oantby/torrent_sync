@@ -2,17 +2,28 @@
 #include <filesystem>
 #include <fstream>
 #include <cmath>
+#include <getopt.h>
+#include <set>
 #include "bencode.hpp"
 #include "sha1.hpp"
 
 using namespace std;
 
 void usage() {
-	cout << "Usage: torrent_tree <source directory> <save directory> <announce URI>\n"
-		"\tCreates a series of torrent files to enable full replication of the "
-		"hierarchy at \033[1msource directory\033[0m, with all files saved to "
-		"\033[1msave directory\033[0m.  \033[1mannounce URI\033[0m is listed "
-		"on the torrents as a valid tracker." << endl;
+	cout << "Usage: torrent_tree -[vquf] [--ignore file_or_dir ...] <source directory> <save directory> <announce URI>\n"
+		"\tCreates a series of torrent files to enable full replication of the \n"
+		"\thierarchy at \033[1msource directory\033[0m, with all files saved to \n"
+		"\t\033[1msave directory\033[0m.  \033[1mannounce URI\033[0m is listed \n"
+		"\ton the torrents as a valid tracker.\n\n"
+		"Options:\n"
+		"\t-v\n\t\tVerbose mode\n\n"
+		"\t-q\n\t\tQuiet mode - anti-verbose mode\n\n"
+		"\t-u\n\t\tUpdate mode - Existing .torrent files will be overwritten IF\n"
+		"\t\tthe source file is newer than the existing .torrent\n\n"
+		"\t-f\n\t\tForce overwrite - All existing .torrent files will be overwritten\n\n"
+		"\t--ignore file_or_dir\n"
+		"\t\tIf file_or_dir is a directory, do not recurse into it.  If file_or_dir\n"
+		"\t\tis a file, do not create a .torrent entry for it\n";
 }
 
 // helper function for path conversions.
@@ -34,42 +45,90 @@ bencode::BencodeVal path_to_list(const string &path, const char sep = '/') {
 	return r;
 }
 
+#define OVERWRITE_NONE 0
+#define OVERWRITE_NEWER 1
+#define OVERWRITE_ALL 2
+
 int main(int argc, char *argv[]) {
-	if (argc < 4) {
+	
+	bool verbose = false;
+	short overwrite = OVERWRITE_NONE;
+	
+	set<filesystem::path> ignored_dirs;
+	struct option long_options[] = {
+		{"ignore", required_argument, 0, 0},
+		{0, 0, 0, 0}
+	};
+	int c, option_index;
+	while ((c = getopt_long(argc, argv, "vquf", long_options, &option_index)) != -1) {
+		
+		switch (c) {
+			case 'v':
+				verbose = true;
+				break;
+			case 'q':
+				verbose = false;
+				break;
+			case 'u':
+				overwrite = OVERWRITE_NEWER;
+				break;
+			case 'f':
+				overwrite = OVERWRITE_ALL;
+				break;
+			case 0:
+				{
+					filesystem::path t = filesystem::absolute(optarg);
+					if (!t.has_filename()) {
+						t = t.parent_path();
+					}
+					
+					if (verbose) {
+						cout << "Adding ignored directory: " << t << endl;
+					}
+					
+					ignored_dirs.insert(t);
+				}
+				break;
+			default:
+				usage();
+				return 1;
+				break;
+		}
+	}
+	
+	if (argc != optind + 3) {
 		usage();
 		return 1;
 	}
+	string start_path = argv[optind];
+	filesystem::path out_path(argv[optind + 1]);
+	string announce_url = argv[optind + 2];
 	
-	bool verbose = argc > 4;
-	
-	if (!filesystem::is_directory(filesystem::status(argv[1]))) {
-		cerr << "No such directory: " << argv[1] << endl;
+	if (!filesystem::is_directory(filesystem::status(start_path))) {
+		cerr << "No such directory: " << start_path << endl;
 		usage();
 		return 2;
 	}
 	
 	{
-		filesystem::file_status saveStat = filesystem::status(argv[2]);
+		filesystem::file_status saveStat = filesystem::status(out_path);
 		if (filesystem::exists(saveStat)) {
 			if (!filesystem::is_directory(saveStat)) {
 				
-				cerr << "Not a directory: " << argv[2] << endl;
+				cerr << "Not a directory: " << out_path << endl;
 				usage();
 				return 3;
 			}
 			
 		} else {
 			// create the output directory (and any directories leading to it).
-			cout << "Creating directory " << argv[2] << endl;
-			filesystem::create_directories(argv[2]);
+			cout << "Creating directory " << out_path << endl;
+			filesystem::create_directories(out_path);
 		}
 	}
 	
 	// because we did no error checking above, getting here should mean all is well
 	// (or exceptions would've occurred).  That's right, I just bragged about not checking for errors.
-	string announce_url = argv[3];
-	string start_path = argv[1];
-	filesystem::path out_path(argv[2]);
 	if (start_path.back() == '/') start_path.pop_back();
 	vector<filesystem::path> path_stack {start_path};
 	string torrent_file_name = path_stack.back().has_filename() ? path_stack.back().filename()
@@ -83,13 +142,34 @@ int main(int argc, char *argv[]) {
 				}
 				
 				filesystem::path file_path = out_path / entry.path().relative_path().replace_extension(".torrent");
-				
+				filesystem::file_status out_status = filesystem::status(file_path);
 				// this will later be based on a command-line argument.
-				if (filesystem::exists(filesystem::status(file_path))) {
-					if (verbose) {
-						cout << "Skipping " << file_path << " - already exists" << endl;
+				if (filesystem::exists(out_status)) {
+					bool skip = true;
+					if (overwrite == OVERWRITE_ALL) {
+						if (verbose) {
+							cout << "Would skip " << file_path << ", but -f specified" << endl;
+						}
+						skip = false;
+					} else if (overwrite == OVERWRITE_NEWER) {
+						if (filesystem::last_write_time(file_path) < filesystem::last_write_time(entry.path())) {
+							if (verbose) {
+								cout << "Would skip " << file_path << ", but -u specified" << endl;
+							}
+							skip = false;
+						}
 					}
-					continue;
+					
+					if (skip) {
+						if (verbose) {
+							cout << "Skipping " << file_path << " - already exists" << endl;
+						}
+						continue;
+					} else {
+						// time to get destructive.  In case this was a directory before (okay, satan),
+						// we're going to delete recursively.
+						filesystem::remove_all(file_path);
+					}
 				}
 				
 				bencode::BencodeVal torrent(bencode::bencode_type::dict);
@@ -138,6 +218,13 @@ int main(int argc, char *argv[]) {
 				ofile.close();
 				
 			} else if (entry.is_directory()) {
+				filesystem::path t = filesystem::absolute(entry.path());
+				if (ignored_dirs.count(t)) {
+					if (verbose) {
+						cout << "Skipping ignored directory " << t << endl;
+					}
+					continue;
+				}
 				path_stack.push_back(entry.path());
 			}
 		}
