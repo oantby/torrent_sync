@@ -110,6 +110,7 @@ int main(int argc, char *argv[]) {
 				file["length"] = file_size;
 				info["files"] = vector<bencode::BencodeVal> {file};
 				info["pieces"] = string();
+				info["private"] = 1;
 				
 				ifstream ifile(entry.path(), ios::in|ios::binary);
 				if (!ifile) {
