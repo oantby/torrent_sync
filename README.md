@@ -67,8 +67,6 @@ torrent_tree /path/to/files output/directory scheme://tracker-uri
 to begin creation of torrent files for every file (recursively) in `/path/to/files`.
 `output/directory` and any subfolders necessary will be created by the process.
 
-Verbosity is enabled by having more than 4 arguments, so tack anything onto the
-end of the `torrent_tree` call to enable verbosity, which notes the beginning and
-finish of processing of each file.
+Call `torrent_tree` with no arguments for available options and other syntax.
 
 Cheers.
