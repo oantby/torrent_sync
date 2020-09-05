@@ -26,6 +26,19 @@ ensures that 1) you can set seeding ratios *per-file* and 2) you can add new fil
 without the need to build a new torrent file that requires re-validating every
 file in the directory.
 
+`transmission_maintenance.py` is not intended to be part of the final product,
+but serves its purpose well in the meantime: it requires `config.py`, specifying
+a dict named `config`, as laid out in the example file.  When run, it will retrieve
+the specified URL listing torrents, retrieve all torrents currently running in
+`transmission-daemon` (from JSON RPC), and make the necessary adjustments to make
+the latter match the former.  Note: it *will* delete any files that are now-untracked.
+
+`transmission_maintenance` allows you to specify a certificate authority (path)
+used to verify server data, as well as a client cert used by the application
+to verify itself to the server.  In a future iteration, these certificates may
+extend to being used for verifying the torrent clients between the tracker and/or
+each other.
+
 ## Future things that may appear here
 
 I kind of like the idea of a trust relationship between the client and peer,
