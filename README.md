@@ -27,7 +27,7 @@ without the need to build a new torrent file that requires re-validating every
 file in the directory.
 
 `transmission_maintenance.py` is not intended to be part of the final product,
-but serves its purpose well in the meantime: it requires `config.py`, specifying
+but serves its purpose well in the meantime.  It requires `config.py`, specifying
 a dict named `config`, as laid out in the example file.  When run, it will retrieve
 the specified URL listing torrents, retrieve all torrents currently running in
 `transmission-daemon` (from JSON RPC), and make the necessary adjustments to make
