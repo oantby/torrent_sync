@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <exception>
+#include <fstream>
 
 using namespace std;
 
@@ -22,7 +23,173 @@ namespace bencode {
 		long long integer;
 		map<string, BencodeVal> dict;
 		
+		static BencodeVal parseInt(string data, size_t &endPos) {
+			if (data.empty() || data[0] != 'i') {
+				throw runtime_error("Invalid integer representation");
+			}
+			data = data.substr(1);
+			if ((data[0] < 48 || data[0] > 57) && data[0] != '-') {
+				throw runtime_error("Invalid integer representation");
+			}
+			BencodeVal r(stol(data, &endPos));
+			if (endPos > data.size() - 1 || data[endPos] != 'e') {
+				throw runtime_error("Invalid integer representation");
+			}
+			endPos += 2; // add the e and the i.
+			return r;
+		}
+		
+		static BencodeVal parseBytes(string data, size_t &endPos) {
+			// must start with an integer.
+			if (data.empty() || data[0] < 48 || data[0] > 57) {
+				throw runtime_error("Invalid bytes representation - byte count invalid");
+			}
+			size_t len = stoul(data, &endPos);
+			// endPos should now be pointing at a colon.
+			if (endPos > data.size() - 2 || data[endPos] != ':') {
+				throw runtime_error("Invalid bytes representation");
+			}
+			
+			if (len + endPos + 1 > data.size()) {
+				throw runtime_error("Invalid bytes representation");
+			}
+			BencodeVal r(data.substr(endPos + 1, len));
+			endPos += 1 + len;
+			return r;
+		}
+		static BencodeVal parseDict(string data, size_t &endPos) {
+			if (data.empty() || data[0] != 'd') {
+				throw runtime_error("Invalid dict representation");
+			}
+			endPos = 1;
+			BencodeVal r(bencode_type::dict);
+			
+			try {
+				size_t s_endPos = 0;
+				while (true) {
+					BencodeVal k = parseBytes(data.substr(endPos), s_endPos);
+					endPos += s_endPos;
+					r[k.bytes] = parse(data.substr(endPos), &s_endPos);
+					endPos += s_endPos;
+				}
+			} catch (runtime_error e) {
+				// reached an invalid string.  hopefully it's the end of the dict.
+				if (data[endPos] != 'e') {
+					throw;
+				}
+			}
+			endPos++;
+			return r;
+		}
+		static BencodeVal parseList(string data, size_t &endPos) {
+			if (data.empty() || data[0] != 'l') {
+				throw runtime_error("Invalid list representation");
+			}
+			endPos = 1;
+			BencodeVal r(bencode_type::list);
+			
+			try {
+				size_t s_endPos = 0;
+				while (true) {
+					BencodeVal k = parse(data.substr(endPos), &s_endPos);
+					endPos += s_endPos;
+					r.list.push_back(k);
+				}
+			} catch (runtime_error e) {
+				if (data[endPos] != 'e') {
+					throw;
+				}
+			}
+			endPos++;
+			return r;
+		}
+		
 		public:
+		
+		static void testThings(string *path = NULL) {
+			size_t idx = 0;
+			string s("11:hello world");
+			BencodeVal b;
+			b = parseBytes(s, idx);
+			
+			cout << "parseBytes(s).toString() == s: " << (b.toString() == s) << endl;
+			cout << "endPos == s.size(): " << (idx == s.size()) << endl;
+			
+			s = "i7144911e";
+			b = parseInt(s, idx);
+			cout << "parseInt(s).toString() == s: " << (b.toString() == s) << endl;
+			cout << "endPos == s.size(): " << (idx == s.size()) << endl;
+			cout << "parseInt(s).integer is correct: " << (b.integer == 7144911) << endl;
+			
+			// those are the easy ones.  here we go.
+			s = "d1:ai0e5:helloi413e3:hey5:helloe";
+			b = parseDict(s, idx);
+			cout << "parseDict(s).toString() == s: " << (b.toString() == s) << endl;
+			cout << "endPos == s.size(): " << (idx == s.size()) << endl;
+			cout << "parseDict(s) contains expected keys with expected values: "
+				<< (b.dict["hey"].bytes == "hello" && b.dict["hello"].integer == 413 && b.dict["a"].integer == 0) << endl;
+			
+			s = "li71e81:A41tiAS0GLSWxCeRmc0H3dMDEttNFacbLVsJzM97jW5DNFdnbKRjGuM11J8plZ8ncd3qopLC68HCQMlrP"
+				"d1:a4:bruhee";
+			b = parseList(s, idx);
+			cout << "parseList(s).toString() == s: " << (b.toString() == s) << endl;
+			cout << "endPos == s.size(): " << (idx == s.size()) << endl;
+			
+			if (path) {
+				// verify a file matches once undone and redone.
+				ifstream ifile(*path, ios::in|ios::binary|ios::ate);
+				size_t size = ifile.tellg();
+				string buff(size, '\0');
+				ifile.seekg(0);
+				if (!ifile.read(&buff[0], size)) {
+					cerr << "Failed to read data from test file" << endl;
+				} else {
+					cout << "Testing given file" << endl;
+					b = parse(buff);
+					cout << "parse(s).toString() == s: " << (b.toString() == buff) << endl;
+				}
+				ifile.close();
+			}
+		}
+		
+		static BencodeVal parse(string data, size_t *endPos = 0) {
+			BencodeVal r;
+			size_t idx = 0;
+			if (data.empty()) return r;
+			switch (data[0]) {
+				case 'i':
+					r = parseInt(data, idx);
+					break;
+				case 'l':
+					r = parseList(data, idx);
+					break;
+				case 'd':
+					r = parseDict(data, idx);
+					break;
+				case '0':
+				case '1':
+				case '2':
+				case '3':
+				case '4':
+				case '5':
+				case '6':
+				case '7':
+				case '8':
+				case '9':
+					r = parseBytes(data, idx);
+					break;
+				default:
+					throw runtime_error("Invalid bencode data");
+					break;
+			}
+			if (idx != data.size() && !endPos) {
+				throw runtime_error("bencode data had more than one root element");
+			} else if (endPos) {
+				*endPos = idx;
+			}
+			
+			return r;
+		}
 		
 		BencodeVal() : type(bencode_type::none) {}
 		BencodeVal(bencode_type t) : type(t) {}
