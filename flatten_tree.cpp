@@ -26,7 +26,7 @@ void usage() {
 // this function from fredoverflow on stackoverflow.  short and simple, I definitely am not gonna make a better one.
 string string_to_hex(const string& input)
 {
-	static const char hex_digits[] = "0123456789ABCDEF";
+	static const char hex_digits[] = "0123456789abcdef";
 	
 	string output;
 	output.reserve(input.length() * 2);
