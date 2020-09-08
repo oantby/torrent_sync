@@ -38,7 +38,7 @@ if len(active_torrents) < 100:
 
 print(json.dumps({'to_add': list(to_add), 'to_remove': list(to_remove)}, indent=4))
 
-if len(to_remove)/len(current_torrents) > 0.1:
+if current_torrents and len(to_remove)/len(current_torrents) > 0.1:
 	print('Tried to remove >10% of current torrents.  Bailing', file=sys.stderr)
 	sys.exit(1)
 
