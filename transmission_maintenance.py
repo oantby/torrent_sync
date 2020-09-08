@@ -31,7 +31,16 @@ current_torrents = set([t['hashString'] for t in r2.json()['arguments']['torrent
 to_remove = current_torrents - active_torrents
 to_add = active_torrents - current_torrents
 
+if len(active_torrents) < 100:
+	# fewer than 100 torrents? not on MY server.
+	print('Too few torrents from server.  Not making changes', file=sys.stderr)
+	sys.exit(1)
+
 print(json.dumps({'to_add': list(to_add), 'to_remove': list(to_remove)}, indent=4))
+
+if len(to_remove)/len(current_torrents) > 0.1:
+	print('Tried to remove >10% of current torrents.  Bailing', file=sys.stderr)
+	sys.exit(1)
 
 transmission_message = {
 	'method': 'torrent-remove',
