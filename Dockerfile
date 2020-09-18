@@ -1,11 +1,9 @@
-FROM ubuntu:latest
+FROM alpine:latest
 
-RUN apt-get -y update
-RUN apt-get -y install clang make
+RUN apk update && apk add g++ make
 
 COPY . /usr/src/
 WORKDIR /usr/src/
 
-RUN CXX=clang++ make -e
-CMD ["/bin/bash"]
+RUN make -e
 
