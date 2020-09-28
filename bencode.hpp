@@ -72,7 +72,7 @@ namespace bencode {
 					r[k.bytes] = parse(data.substr(endPos), &s_endPos);
 					endPos += s_endPos;
 				}
-			} catch (runtime_error e) {
+			} catch (runtime_error &e) {
 				// reached an invalid string.  hopefully it's the end of the dict.
 				if (data[endPos] != 'e') {
 					throw;
@@ -95,7 +95,7 @@ namespace bencode {
 					endPos += s_endPos;
 					r.list.push_back(k);
 				}
-			} catch (runtime_error e) {
+			} catch (runtime_error &e) {
 				if (data[endPos] != 'e') {
 					throw;
 				}
